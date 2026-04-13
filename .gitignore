@@ -1,4 +1,6 @@
-# Dependency directories
+# =========================
+# Node.js (if frontend exists)
+# =========================
 node_modules/
 
 # Logs
@@ -15,7 +17,7 @@ pids
 *.seed
 *.pid.lock
 
-# Coverage directory used by tools like Jest
+# Coverage directory (Jest, etc.)
 coverage/
 
 # Build outputs
@@ -28,41 +30,93 @@ out/
 .env
 .env.*.local
 
-# MacOS files
+# MacOS / Windows
 .DS_Store
-
-# Windows files
 Thumbs.db
 
-# IDEs and editors
+# IDEs
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# Optional npm cache
+# Caches
 .npm
-
-# Optional eslint cache
 .eslintcache
-
-# TypeScript cache
-*.tsbuildinfo
-
-# Parcel cache
 .cache/
 
 # Temporary files
 tmp/
 temp/
 
-# Debug
+# Archives
 *.tgz
 
-# Yarn integrity file
-.yarn-integrity
-
-# Lock files (optional — keep if you want reproducible installs)
+# Lock files (optional)
 # package-lock.json
 # yarn.lock
 # pnpm-lock.yaml
+
+
+# =========================
+# Python / Flask
+# =========================
+
+# Byte-compiled / optimized files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+venv.bak/
+
+# Flask instance folder (often contains config/db)
+instance/
+
+# Flask / Werkzeug cache
+*.log
+flask_session/
+*.sqlite3
+*.db
+
+# Pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# MyPy / type checking
+.mypy_cache/
+.dmypy.json
+
+# PyInstaller
+*.spec
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Python packaging
+.Python
+build/
+dist/
+*.egg-info/
+
+# pip
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Poetry
+poetry.lock
+
+# dotenv (already included above but repeated for clarity)
+.env
+
+# VS Code Python env cache (optional)
+.pyre/
+.ruff_cache/

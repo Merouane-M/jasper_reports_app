@@ -1,6 +1,6 @@
-# JasperReports Web Portal
+# JasperPortal — Full-Stack Report Management System
 
-A production-ready web application for managing and running JasperReports Server reports, with role-based access control and a full immutable audit trail.
+React + Flask + MS SQL Server + JasperReports Server
 
 ---
 
@@ -8,12 +8,11 @@ A production-ready web application for managing and running JasperReports Server
 
 | Layer      | Technology                          |
 |------------|-------------------------------------|
-| Frontend   | React 18 + TypeScript + Tailwind CSS |
-| Backend    | Node.js + Express + TypeScript       |
-| Database   | PostgreSQL 14+                       |
-| Auth       | JWT (access + refresh token rotation)|
-| Reports    | JasperReports Server REST API v2     |
-| Export     | ExcelJS (XLSX), native CSV/JSON      |
+| Frontend   | React 18, TypeScript, Tailwind CSS  |
+| Backend    | Python 3.11+, Flask, Flask-JWT-Extended |
+| Database   | Microsoft SQL Server 2019+          |
+| Auth       | JWT (access + refresh tokens)       |
+| Reports    | JasperReports Server REST API v2    |
 
 ---
 
@@ -22,206 +21,254 @@ A production-ready web application for managing and running JasperReports Server
 ```
 jasper-reports-app/
 ├── backend/
-│   ├── src/
-│   │   ├── index.ts                        # Express app entry point
-│   │   ├── db.ts                           # PostgreSQL pool
-│   │   ├── auth/
-│   │   │   ├── auth.service.ts             # register, login, refresh, logout
-│   │   │   └── auth.routes.ts
-│   │   ├── reports/
-│   │   │   ├── reports.service.ts          # CRUD, parameters, access
-│   │   │   └── reports.routes.ts
-│   │   ├── users/
-│   │   │   └── users.routes.ts
-│   │   ├── jasper/
-│   │   │   └── jasper.routes.ts            # JasperReports REST v2 client
-│   │   ├── audit/
-│   │   │   └── audit.routes.ts             # logs, filters, export
-│   │   ├── common/middleware/
-│   │   │   ├── auth.middleware.ts          # JWT verify + RBAC
-│   │   │   └── audit.middleware.ts         # auto-log admin actions
-│   │   └── migrations/
-│   │       ├── 001_initial_schema.sql      # full schema
-│   │       └── run.ts                      # idempotent runner
+│   ├── app.py              # Flask app factory + seeding
+│   ├── database.py         # SQLAlchemy instance
+│   ├── models.py           # All DB models
+│   ├── audit_utils.py      # Audit logging helpers + constants
+│   ├── requirements.txt
 │   ├── .env.example
-│   ├── package.json
-│   └── tsconfig.json
-│
+│   └── routes/
+│       ├── auth.py         # Login, register, refresh
+│       ├── reports.py      # User-facing report execution
+│       ├── admin.py        # Admin report & access CRUD
+│       ├── audit.py        # Audit log queries + export
+│       └── users.py        # Admin user management
 ├── frontend/
 │   ├── src/
+│   │   ├── App.tsx
 │   │   ├── main.tsx
-│   │   ├── App.tsx                         # routing
-│   │   ├── index.css                       # Tailwind + component classes
+│   │   ├── index.css
+│   │   ├── context/AuthContext.tsx
+│   │   ├── utils/api.ts
 │   │   ├── types/index.ts
-│   │   ├── services/api.ts                 # Axios client + all API calls
-│   │   ├── hooks/useAuth.tsx               # Auth context + provider
-│   │   ├── components/layout/AppLayout.tsx # sidebar + nav
+│   │   ├── components/DashboardLayout.tsx
 │   │   └── pages/
 │   │       ├── LoginPage.tsx
 │   │       ├── RegisterPage.tsx
-│   │       ├── DashboardPage.tsx           # report list for users
-│   │       ├── ReportRunPage.tsx           # dynamic parameter form + preview
-│   │       └── admin/
-│   │           ├── AdminReportsPage.tsx    # full report CRUD + params + access
-│   │           ├── AdminUsersPage.tsx      # user management + roles
-│   │           └── AuditPage.tsx           # logs, filters, pagination, export
+│   │       ├── ReportsPage.tsx
+│   │       ├── AdminReportsPage.tsx
+│   │       ├── AdminUsersPage.tsx
+│   │       └── AuditLogsPage.tsx
 │   ├── index.html
 │   ├── package.json
 │   ├── vite.config.ts
-│   ├── tailwind.config.js
-│   └── tsconfig.json
-│
-└── docs/
-    └── sample_audit_logs.json
+│   └── tailwind.config.js
+└── schema.sql              # MS SQL Server schema
 ```
 
 ---
 
 ## Prerequisites
 
+- Python 3.11+
 - Node.js 18+
-- PostgreSQL 14+
-- A running JasperReports Server instance (6.x or later)
+- Microsoft SQL Server 2019+ (or SQL Server Express)
+- ODBC Driver 17 or 18 for SQL Server
+- JasperReports Server (optional for report execution)
+
+### Install ODBC Driver (Ubuntu/Debian)
+```bash
+curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add -
+curl https://packages.microsoft.com/config/ubuntu/22.04/prod.list > /etc/apt/sources.list.d/mssql-release.list
+apt-get update
+ACCEPT_EULA=Y apt-get install -y msodbcsql17 unixodbc-dev
+```
+
+### Install ODBC Driver (macOS)
+```bash
+brew tap microsoft/mssql-release
+brew install msodbcsql17
+```
 
 ---
 
-## Setup
-
-### 1. Database
-
-```bash
-createdb jasper_reports
-```
-
-### 2. Backend
+## Setup — Backend
 
 ```bash
 cd backend
+
+# 1. Create virtual environment
+python -m venv venv
+source venv/bin/activate       # Windows: venv\Scripts\activate
+
+# 2. Install dependencies
+pip install -r requirements.txt
+
+# 3. Configure environment
 cp .env.example .env
-# Edit .env with your DB credentials, JWT secrets, and Jasper URL
-npm install
-npm run migrate       # runs all SQL migrations
-npm run dev           # starts on http://localhost:3001
+# Edit .env with your DB credentials and secrets
+
+# 4. Initialize database (Flask will auto-create tables)
+python app.py
 ```
 
-### 3. Frontend
+The server starts at **http://localhost:5000**
+
+Default admin credentials (seeded automatically):
+- Email: `admin@jasper.com`
+- Password: `Admin@123`
+
+---
+
+## Setup — Frontend
 
 ```bash
 cd frontend
+
+# 1. Install dependencies
 npm install
-npm run dev           # starts on http://localhost:3000
+
+# 2. Start dev server
+npm run dev
+```
+
+The app opens at **http://localhost:5173**
+
+---
+
+## Setup — Database
+
+Run the schema manually (optional — Flask auto-creates tables):
+
+```sql
+-- In SQL Server Management Studio or sqlcmd:
+sqlcmd -S localhost -U sa -P YourPassword -i schema.sql
 ```
 
 ---
 
 ## Environment Variables
 
-See `backend/.env.example` for the full list. Key variables:
+```env
+# Flask
+FLASK_ENV=development
+SECRET_KEY=change-this-in-production
+DEBUG=True
 
-| Variable              | Description                              |
-|-----------------------|------------------------------------------|
-| `DB_*`                | PostgreSQL connection settings           |
-| `JWT_SECRET`          | Min 32-char random string                |
-| `JWT_REFRESH_SECRET`  | Separate secret for refresh tokens       |
-| `JASPER_BASE_URL`     | e.g. `http://localhost:8080/jasperserver`|
-| `JASPER_USERNAME`     | JasperReports admin username             |
-| `JASPER_PASSWORD`     | JasperReports admin password             |
-| `FRONTEND_URL`        | Used for CORS (default: `localhost:3000`)|
+# MS SQL Server
+DB_DRIVER=ODBC Driver 17 for SQL Server
+DB_SERVER=localhost
+DB_PORT=1433
+DB_NAME=jasper_reports_db
+DB_USER=sa
+DB_PASSWORD=YourStrong@Password
 
----
+# JWT (use long random strings in production)
+JWT_SECRET_KEY=change-this-jwt-secret
+JWT_ACCESS_TOKEN_EXPIRES=3600       # 1 hour
+JWT_REFRESH_TOKEN_EXPIRES=604800    # 7 days
 
-## Default Admin Account
+# JasperReports Server
+JASPER_BASE_URL=http://localhost:8080/jasperserver
+JASPER_USERNAME=jasperadmin
+JASPER_PASSWORD=jasperadmin
 
-After running migrations, a default admin account is created:
-
-- **Email:** `admin@example.com`
-- **Password:** `Admin@123`
-
-Change this password immediately after first login.
+# CORS
+FRONTEND_URL=http://localhost:5173
+```
 
 ---
 
 ## API Reference
 
 ### Auth
-| Method | Endpoint              | Description            |
-|--------|-----------------------|------------------------|
-| POST   | `/api/auth/register`  | Register new user      |
-| POST   | `/api/auth/login`     | Login → tokens         |
-| POST   | `/api/auth/refresh`   | Rotate refresh token   |
-| POST   | `/api/auth/logout`    | Revoke refresh token   |
+| Method | Endpoint              | Description              |
+|--------|-----------------------|--------------------------|
+| POST   | /api/auth/register    | Register new user        |
+| POST   | /api/auth/login       | Login → tokens           |
+| POST   | /api/auth/refresh     | Refresh access token     |
+| GET    | /api/auth/me          | Get current user         |
 
-### Reports
-| Method | Endpoint                          | Access | Description              |
-|--------|-----------------------------------|--------|--------------------------|
-| GET    | `/api/reports`                    | All    | List accessible reports  |
-| GET    | `/api/reports/:id`                | All    | Get report + parameters  |
-| POST   | `/api/reports`                    | Admin  | Create report            |
-| PUT    | `/api/reports/:id`                | Admin  | Update report            |
-| DELETE | `/api/reports/:id`                | Admin  | Soft-delete report       |
-| PATCH  | `/api/reports/:id/toggle`         | Admin  | Toggle active status     |
-| POST   | `/api/reports/:id/parameters`     | Admin  | Replace all parameters   |
-| POST   | `/api/reports/:id/access`         | Admin  | Grant access to user     |
-| DELETE | `/api/reports/:id/access`         | Admin  | Revoke access            |
+### Reports (User)
+| Method | Endpoint                          | Description              |
+|--------|-----------------------------------|--------------------------|
+| GET    | /api/reports/                     | List accessible reports  |
+| GET    | /api/reports/:id                  | Get report + parameters  |
+| POST   | /api/reports/:id/execute          | Execute & download report|
 
-### Jasper Execution
-| Method | Endpoint                        | Description                   |
-|--------|---------------------------------|-------------------------------|
-| POST   | `/api/jasper/execute/:reportId` | Execute + stream report output |
+### Admin — Reports
+| Method | Endpoint                                   | Description             |
+|--------|--------------------------------------------|-------------------------|
+| GET    | /api/admin/reports                         | All reports             |
+| POST   | /api/admin/reports                         | Create report           |
+| PUT    | /api/admin/reports/:id                     | Update report           |
+| DELETE | /api/admin/reports/:id                     | Soft delete             |
+| PATCH  | /api/admin/reports/:id/toggle-visibility   | Toggle visibility       |
+| GET    | /api/admin/reports/:id/access              | Get access list         |
+| POST   | /api/admin/reports/:id/access              | Grant access            |
+| DELETE | /api/admin/reports/:id/access/:uid         | Revoke access           |
 
-Request body: `{ "parameters": { "startDate": "2025-01-01" }, "format": "pdf" }`
+### Admin — Users
+| Method | Endpoint                    | Description           |
+|--------|-----------------------------|-----------------------|
+| GET    | /api/users/                 | All users             |
+| POST   | /api/users/                 | Create user           |
+| PUT    | /api/users/:id              | Update user           |
+| PATCH  | /api/users/:id/toggle-status| Activate/deactivate   |
 
-### Audit Logs (Admin only)
-| Method | Endpoint            | Description                              |
-|--------|---------------------|------------------------------------------|
-| GET    | `/api/audit`        | Paginated logs with filters              |
-| GET    | `/api/audit/export` | Export (add `?format=csv|xlsx|json`)     |
-| GET    | `/api/audit/meta`   | Available action/entity types for UI     |
+### Audit Logs
+| Method | Endpoint                   | Description                 |
+|--------|----------------------------|-----------------------------|
+| GET    | /api/audit/                | Paginated logs (with filters)|
+| GET    | /api/audit/stats           | Summary statistics          |
+| GET    | /api/audit/export/csv      | Export CSV                  |
+| GET    | /api/audit/export/xlsx     | Export Excel                |
+| GET    | /api/audit/export/json     | Export JSON                 |
+| GET    | /api/audit/action-types    | Distinct action types       |
+| GET    | /api/audit/entity-types    | Distinct entity types       |
 
-**Audit filter params:** `from`, `to`, `adminUserId`, `actionType`, `entityType`, `search`, `page`, `limit`
-
-### Users (Admin only)
-| Method | Endpoint                   | Description               |
-|--------|----------------------------|---------------------------|
-| GET    | `/api/users`               | List all users            |
-| PUT    | `/api/users/:id/role`      | Change user role          |
-| PATCH  | `/api/users/:id/toggle`    | Activate / deactivate     |
-| GET    | `/api/users/:id/access`    | List user's report access |
-
----
-
-## Security Design
-
-- **Passwords** hashed with bcrypt (10 rounds)
-- **Access tokens** expire in 15 minutes; **refresh tokens** rotate on every use
-- **Refresh tokens** stored as SHA-256 hashes — plain token never persisted
-- **Audit logs** are made immutable via PostgreSQL `RULE` — no `UPDATE` or `DELETE` is possible from any connection
-- **Rate limiting** applied globally (100 req/15min) and stricter on auth endpoints (20 req/15min)
-- **Input validation** on all write endpoints via `express-validator`
-- **CORS** restricted to `FRONTEND_URL`
-- **Helmet** sets secure HTTP headers
-
----
-
-## Audit Trail Design
-
-All admin actions are automatically intercepted by `audit.middleware.ts`:
-
-1. Request comes in to a mutating endpoint (`POST`/`PUT`/`PATCH`/`DELETE`)
-2. Middleware checks: is the user authenticated and is their role `admin`?
-3. It maps the HTTP method + path to an `action_type` (e.g. `DELETE /api/reports/:id` → `DELETE_REPORT`)
-4. It captures the request body as `before_snapshot`
-5. It wraps `res.json` to capture the response as `after_snapshot`
-6. On successful response (status < 400), it writes to `audit_logs` with IP and user agent
-
-The `audit_logs` table has a PostgreSQL `RULE` that silently swallows any `UPDATE` or `DELETE` statements — the records are permanently immutable.
+#### Audit Log Filter Query Params
+```
+?page=1&per_page=20
+&search=text
+&admin_user_id=1
+&action_type=CREATE_REPORT
+&entity_type=Report
+&date_from=2025-01-01
+&date_to=2025-12-31
+```
 
 ---
 
-## Assumptions
+## Tracked Audit Events
 
-1. JasperReports Server uses REST API v2 (standard for JRS 6.x+). If using v1, update the client in `jasper.routes.ts`.
-2. Report parameters are defined in the portal (not pulled from JasperReports directly). This gives admins full control over what users see.
-3. Refresh tokens are stored in `localStorage` on the frontend. For higher security environments, consider `httpOnly` cookies instead.
-4. The default admin password in the seed data is a bcrypt hash of `Admin@123` — change it immediately in production.
-5. The audit middleware captures the full request body as `before_snapshot`. Sensitive fields like `password` should be stripped before logging — add a sanitizer in `audit.middleware.ts` for production.
+| Action Type        | Trigger                              |
+|--------------------|--------------------------------------|
+| LOGIN_SUCCESS      | Successful login                     |
+| LOGIN_FAILED       | Failed login attempt                 |
+| CREATE_REPORT      | Admin creates a report               |
+| UPDATE_REPORT      | Admin edits a report                 |
+| DELETE_REPORT      | Admin soft-deletes a report          |
+| TOGGLE_VISIBILITY  | Admin shows/hides a report           |
+| CREATE_USER        | Admin creates a user                 |
+| UPDATE_USER        | Admin edits a user                   |
+| DEACTIVATE_USER    | Admin deactivates a user             |
+| ACTIVATE_USER      | Admin reactivates a user             |
+| CHANGE_ROLE        | Admin changes a user's role          |
+| GRANT_ACCESS       | Admin grants report access           |
+| REVOKE_ACCESS      | Admin revokes report access          |
+
+---
+
+## Design Assumptions
+
+1. **JasperReports Server** must be running separately. If unavailable, report execution returns a 502 error with a clear message.
+2. **Soft deletes** — reports are never hard-deleted from the DB; `is_deleted=True` hides them.
+3. **Audit logs are immutable** — there is no UI or API to edit or delete them.
+4. **Admins can see all reports** regardless of visibility or access settings.
+5. JWT refresh tokens are stored in `localStorage`. For production, consider `httpOnly` cookies.
+6. The default admin is seeded on first startup if no admin exists.
+
+---
+
+## Production Checklist
+
+- [ ] Change `SECRET_KEY` and `JWT_SECRET_KEY` to strong random values
+- [ ] Set `DEBUG=False` and `FLASK_ENV=production`
+- [ ] Use HTTPS (TLS)
+- [ ] Put Flask behind Gunicorn + Nginx
+- [ ] Add SQL Server connection pooling (`pool_size`, `max_overflow` in SQLAlchemy)
+- [ ] Store refresh tokens in httpOnly cookies
+- [ ] Enable SQL Server Always Encrypted for sensitive columns
+- [ ] Add rate limiting on `/api/auth/login`
+- [ ] Set up DB backups for `audit_logs` table
