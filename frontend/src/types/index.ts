@@ -2,6 +2,7 @@ export interface Role {
   id: number
   name: string
   description: string
+  is_system: boolean
 }
 
 export interface User {
@@ -19,7 +20,7 @@ export interface ReportParameter {
   report_id: number
   name: string
   label: string
-  param_type: 'text' | 'number' | 'date' | 'dropdown'
+  param_type: 'text' | 'number' | 'date' | 'dropdown' | 'multiselect'
   is_required: boolean
   default_value: string | null
   dropdown_options: string[]
@@ -34,6 +35,7 @@ export interface Report {
   http_method: string
   is_public: boolean
   is_visible: boolean
+  ignore_pagination: boolean
   created_at: string
   parameters: ReportParameter[]
 }
@@ -77,8 +79,10 @@ export interface UserReportAccess {
   granted_at: string
 }
 
-export interface AuthState {
-  user: User | null
-  token: string | null
-  refreshToken: string | null
+export interface RoleReportAccess {
+  id: number
+  role_id: number
+  report_id: number
+  role_name: string
+  granted_at: string
 }

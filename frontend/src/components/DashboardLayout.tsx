@@ -1,102 +1,121 @@
-import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { Outlet, NavLink } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useTheme } from '../context/ThemeContext'
 import {
-  BarChart3, FileText, Users, Shield, LogOut,
-  ChevronRight, Activity
+  BarChart3, FileText, Users, Activity,
+  LogOut, Sun, Moon, KeyRound, ShieldCheck, UserCog
 } from 'lucide-react'
 
 export default function DashboardLayout() {
   const { user, logout, isAdmin } = useAuth()
-  const navigate = useNavigate()
-
-  const navItems = [
-    { to: '/reports', icon: FileText, label: 'My Reports' },
-    ...(isAdmin ? [
-      { to: '/admin/reports', icon: BarChart3, label: 'Manage Reports' },
-      { to: '/admin/users', icon: Users, label: 'Users' },
-      { to: '/admin/audit', icon: Activity, label: 'Audit Logs' },
-    ] : []),
-  ]
+  const { theme, toggleTheme } = useTheme()
 
   return (
-    <div className="min-h-screen bg-navy-950 bg-grid flex">
-      {/* Sidebar */}
-      <aside className="w-60 shrink-0 glass border-r border-slate-800/60 flex flex-col h-screen sticky top-0">
+    <div style={{ display:'flex', minHeight:'100vh', background:'var(--bg-base)' }}>
+      {/* ── SIDEBAR ── */}
+      <aside style={{
+        width: 232, flexShrink: 0,
+        background: 'var(--sidebar-bg)',
+        borderRight: '1px solid var(--sidebar-border)',
+        display: 'flex', flexDirection: 'column',
+        height: '100vh', position: 'sticky', top: 0,
+        boxShadow: 'var(--shadow-sm)',
+      }}>
         {/* Logo */}
-        <div className="p-5 border-b border-slate-800/60">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-accent-500/15 border border-accent-500/30 rounded-lg flex items-center justify-center">
-              <BarChart3 className="w-4 h-4 text-accent-400" />
-            </div>
-            <div>
-              <h1 className="font-display text-sm font-bold text-white leading-none">JasperPortal</h1>
-              <p className="text-[10px] text-slate-500 mt-0.5">Reports Platform</p>
-            </div>
+        <div style={{ padding: '1.125rem 1rem', borderBottom: '1px solid var(--border)', display:'flex', alignItems:'center', gap:10 }}>
+          <div style={{
+            width:34, height:34, borderRadius:9,
+            background:'var(--brand)', display:'flex', alignItems:'center', justifyContent:'center',
+            boxShadow:'0 2px 8px rgba(37,99,235,0.35)'
+          }}>
+            <BarChart3 size={18} color="#fff" />
+          </div>
+          <div>
+            <div style={{ fontFamily:'Outfit', fontWeight:700, fontSize:'0.95rem', color:'var(--text-primary)', lineHeight:1 }}>JasperPortal</div>
+            <div style={{ fontSize:'0.68rem', color:'var(--text-muted)', marginTop:2 }}>Gestion des rapports</div>
           </div>
         </div>
 
-        {/* Nav */}
-        <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto scroll-custom">
-          {isAdmin && (
-            <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-widest px-3 py-2 mt-1">
-              User
-            </p>
-          )}
-          <NavLink to="/reports"
-            className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-            <FileText className="w-4 h-4" />
-            My Reports
+        {/* Navigation */}
+        <nav style={{ flex:1, padding:'0.75rem 0.625rem', overflowY:'auto' }} className="scroll-thin">
+
+          <div className="nav-section-label">Rapports</div>
+          <NavLink to="/rapports" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+            <FileText size={16} /><span>Mes rapports</span>
           </NavLink>
 
           {isAdmin && (
             <>
-              <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-widest px-3 py-2 mt-3">
-                Administration
-              </p>
-              <NavLink to="/admin/reports"
-                className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-                <BarChart3 className="w-4 h-4" />
-                Manage Reports
+              <div className="nav-section-label" style={{ marginTop:'1rem' }}>Administration</div>
+              <NavLink to="/admin/rapports"     className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+                <BarChart3 size={16} /><span>Gérer les rapports</span>
               </NavLink>
-              <NavLink to="/admin/users"
-                className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-                <Users className="w-4 h-4" />
-                Users
+              <NavLink to="/admin/utilisateurs" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+                <Users size={16} /><span>Utilisateurs</span>
               </NavLink>
-              <NavLink to="/admin/audit"
-                className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-                <Activity className="w-4 h-4" />
-                Audit Logs
+              <NavLink to="/admin/roles"        className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+                <ShieldCheck size={16} /><span>Rôles</span>
+              </NavLink>
+              <NavLink to="/admin/audit"        className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+                <Activity size={16} /><span>Journal d'audit</span>
               </NavLink>
             </>
           )}
+
+          <div className="nav-section-label" style={{ marginTop:'1rem' }}>Mon compte</div>
+          <NavLink to="/mon-compte" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+            <KeyRound size={16} /><span>Changer le mot de passe</span>
+          </NavLink>
         </nav>
 
-        {/* User info */}
-        <div className="p-3 border-t border-slate-800/60">
-          <div className="flex items-center gap-3 px-2 py-2">
-            <div className="w-8 h-8 rounded-full bg-accent-500/20 border border-accent-500/30 flex items-center justify-center shrink-0">
-              <span className="text-accent-400 text-xs font-bold uppercase">
+        {/* Footer */}
+        <div style={{ padding:'0.75rem', borderTop:'1px solid var(--border)' }}>
+          {/* Theme toggle */}
+          <button onClick={toggleTheme} className="nav-link" style={{ width:'100%', marginBottom:4 }}>
+            {theme === 'light'
+              ? <><Moon size={16} /><span>Mode sombre</span></>
+              : <><Sun size={16} /><span>Mode clair</span></>
+            }
+          </button>
+
+          {/* User info + logout */}
+          <div style={{ display:'flex', alignItems:'center', gap:8, padding:'0.5rem 0.75rem' }}>
+            <div style={{
+              width:30, height:30, borderRadius:'50%',
+              background:'var(--brand-light)',
+              border:'2px solid var(--brand)',
+              display:'flex', alignItems:'center', justifyContent:'center',
+              flexShrink:0,
+            }}>
+              <span style={{ color:'var(--brand)', fontSize:'0.7rem', fontWeight:800, textTransform:'uppercase' }}>
                 {user?.username?.[0] || '?'}
               </span>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-white truncate">{user?.username}</p>
-              <span className={`text-[10px] font-medium ${user?.role?.name === 'admin' ? 'text-gold-400' : 'text-slate-500'}`}>
-                {user?.role?.name === 'admin' ? '⚡ Admin' : 'User'}
-              </span>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontSize:'0.8rem', fontWeight:600, color:'var(--text-primary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                {user?.username}
+              </div>
+              <div style={{ fontSize:'0.68rem', color:'var(--text-muted)' }}>
+                {user?.role?.name}
+              </div>
             </div>
-            <button onClick={logout}
-              className="text-slate-600 hover:text-red-400 transition-colors p-1"
-              title="Sign out">
-              <LogOut className="w-4 h-4" />
+            <button onClick={logout} title="Se déconnecter" style={{
+              background:'none', border:'none', cursor:'pointer',
+              color:'var(--text-muted)', padding:4, borderRadius:6,
+              display:'flex', alignItems:'center',
+              transition:'color 0.15s'
+            }}
+              onMouseEnter={e => (e.currentTarget.style.color='#dc2626')}
+              onMouseLeave={e => (e.currentTarget.style.color='var(--text-muted)')}
+            >
+              <LogOut size={15} />
             </button>
           </div>
         </div>
       </aside>
 
-      {/* Main content */}
-      <main className="flex-1 min-w-0 overflow-y-auto scroll-custom">
+      {/* ── MAIN CONTENT ── */}
+      <main style={{ flex:1, minWidth:0, overflowY:'auto' }} className="scroll-thin">
         <Outlet />
       </main>
     </div>

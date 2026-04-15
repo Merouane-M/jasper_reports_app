@@ -4,7 +4,7 @@ from flask import Blueprint, request, jsonify, Response
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from database import db
-from models import User, Report, UserReportAccess
+from models import User, Report, UserReportAccess, RoleReportAccess
 
 reports_bp = Blueprint("reports", __name__)
 
@@ -14,30 +14,32 @@ def get_current_user():
     return User.query.get(user_id)
 
 
+def user_can_access(user: User, report: Report) -> bool:
+    if user.role.name == "admin":
+        return True
+    if report.is_public:
+        return True
+    # User-level access
+    if UserReportAccess.query.filter_by(user_id=user.id, report_id=report.id).first():
+        return True
+    # Role-level access
+    if RoleReportAccess.query.filter_by(role_id=user.role_id, report_id=report.id).first():
+        return True
+    return False
+
+
 @reports_bp.route("/", methods=["GET"])
 @jwt_required()
 def list_reports():
     user = get_current_user()
     if not user:
-        return jsonify({"error": "User not found"}), 404
+        return jsonify({"error": "Utilisateur introuvable"}), 404
 
     if user.role.name == "admin":
         reports = Report.query.filter_by(is_deleted=False, is_visible=True).all()
     else:
-        # Public reports + reports user has access to
-        public_reports = Report.query.filter_by(is_deleted=False, is_visible=True, is_public=True).all()
-        access_ids = [a.report_id for a in UserReportAccess.query.filter_by(user_id=user.id).all()]
-        private_reports = Report.query.filter(
-            Report.id.in_(access_ids),
-            Report.is_deleted == False,
-            Report.is_visible == True
-        ).all()
-        seen = set()
-        reports = []
-        for r in public_reports + private_reports:
-            if r.id not in seen:
-                seen.add(r.id)
-                reports.append(r)
+        all_reports = Report.query.filter_by(is_deleted=False, is_visible=True).all()
+        reports = [r for r in all_reports if user_can_access(user, r)]
 
     return jsonify([r.to_dict(include_params=True) for r in reports]), 200
 
@@ -48,15 +50,9 @@ def get_report(report_id):
     user = get_current_user()
     report = Report.query.filter_by(id=report_id, is_deleted=False).first()
     if not report:
-        return jsonify({"error": "Report not found"}), 404
-
-    if user.role.name != "admin":
-        has_access = report.is_public or UserReportAccess.query.filter_by(
-            user_id=user.id, report_id=report_id
-        ).first()
-        if not has_access:
-            return jsonify({"error": "Access denied"}), 403
-
+        return jsonify({"error": "Rapport introuvable"}), 404
+    if not user_can_access(user, report):
+        return jsonify({"error": "Accès refusé"}), 403
     return jsonify(report.to_dict(include_params=True)), 200
 
 
@@ -66,55 +62,66 @@ def execute_report(report_id):
     user = get_current_user()
     report = Report.query.filter_by(id=report_id, is_deleted=False).first()
     if not report:
-        return jsonify({"error": "Report not found"}), 404
+        return jsonify({"error": "Rapport introuvable"}), 404
+    if not user_can_access(user, report):
+        return jsonify({"error": "Accès refusé"}), 403
 
-    if user.role.name != "admin":
-        has_access = report.is_public or UserReportAccess.query.filter_by(
-            user_id=user.id, report_id=report_id
-        ).first()
-        if not has_access:
-            return jsonify({"error": "Access denied"}), 403
+    body = request.get_json() or {}
+    output_format = body.pop("output_format", "pdf").upper()
 
-    params = request.get_json() or {}
-    output_format = params.pop("output_format", "pdf").upper()
+    # Build query params — multiselect values are lists → repeated keys for Jasper ArrayList
+    # Jasper expects: ?param=val1&param=val2  to fill an ArrayList parameter
+    query_params: list[tuple[str, str]] = []
+    for key, value in body.items():
+        if isinstance(value, list):
+            # multiselect → repeated key pattern
+            for item in value:
+                query_params.append((key, item))
+        else:
+            query_params.append((key, value))
 
-    jasper_base = os.getenv("JASPER_BASE_URL", "http://172:8080/jasperserver")
-    jasper_user = os.getenv("JASPER_USERNAME", "jasperadmin")
-    jasper_pass = os.getenv("JASPER_PASSWORD", "jasperadmin")
+    jasper_base = os.getenv("JASPER_BASE_URL")
+    jasper_user = os.getenv("JASPER_USERNAME")
+    jasper_pass = os.getenv("JASPER_PASSWORD")
+    # ignore_pagination support
 
-    url = f"{jasper_base}/rest_v2/reports{report.jasper_url}.{output_format}"
+    if report.ignore_pagination and output_format == body.pop("output_format", "xlsx").upper():
+        query_params.append(("ignorePagination", "true"))
+        url = f"{jasper_base}/rest_v2/reports{report.jasper_url}.{output_format}"
+    
+    else : 
+        url = f"{jasper_base}/rest_v2/reports{report.jasper_url}.{output_format}"
 
     try:
         response = requests.request(
             method=report.http_method,
             url=url,
-            params=params,
+            params=query_params,
             auth=(jasper_user, jasper_pass),
-            timeout=60,
-            stream=True
+            timeout=120,
+            stream=True,
         )
         response.raise_for_status()
 
-        content_type_map = {
-            "pdf": "application/pdf",
+        mime_map = {
+            "PDF":  "application/pdf",
             "XLSX": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            "CSV": "text/csv",
+            "CSV":  "text/csv",
             "HTML": "text/html",
             "DOCX": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         }
-        content_type = content_type_map.get(output_format, "application/octet-stream")
+        mime = mime_map.get(output_format, "application/octet-stream")
+        ext = output_format.lower()
 
         return Response(
             response.content,
             status=200,
-            mimetype=content_type,
-            headers={
-                "Content-Disposition": f"attachment; filename=report_{report_id}.{output_format.lower()}"
-            }
+            mimetype=mime,
+            headers={"Content-Disposition": f"attachment; filename=rapport_{report_id}.{ext}"},
         )
     except requests.exceptions.ConnectionError:
-        return jsonify({"error": "Cannot connect to JasperReports Server"}), 502
+        return jsonify({"error": "Impossible de se connecter au serveur JasperReports"}), 502
     except requests.exceptions.HTTPError as e:
-        return jsonify({"error": f"JasperReports error: {str(e)}"}), e.response.status_code
+        return jsonify({"error": f"Erreur JasperReports : {str(e)}"}), e.response.status_code
     except Exception as e:
         return jsonify({"error": str(e)}), 500

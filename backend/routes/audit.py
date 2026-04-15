@@ -15,37 +15,29 @@ def require_admin():
     user_id = int(get_jwt_identity())
     user = User.query.get(user_id)
     if not user or user.role.name != "admin":
-        return None, (jsonify({"error": "Admin access required"}), 403)
+        return None, (jsonify({"error": "Accès administrateur requis"}), 403)
     return user, None
 
 
 def build_query(args):
     query = AuditLog.query
 
-    # Filters
     if args.get("admin_user_id"):
         query = query.filter(AuditLog.admin_user_id == int(args["admin_user_id"]))
-
     if args.get("action_type"):
         query = query.filter(AuditLog.action_type == args["action_type"])
-
     if args.get("entity_type"):
         query = query.filter(AuditLog.entity_type == args["entity_type"])
-
     if args.get("date_from"):
         try:
-            d = datetime.fromisoformat(args["date_from"])
-            query = query.filter(AuditLog.timestamp >= d)
+            query = query.filter(AuditLog.timestamp >= datetime.fromisoformat(args["date_from"]))
         except ValueError:
             pass
-
     if args.get("date_to"):
         try:
-            d = datetime.fromisoformat(args["date_to"])
-            query = query.filter(AuditLog.timestamp <= d)
+            query = query.filter(AuditLog.timestamp <= datetime.fromisoformat(args["date_to"]))
         except ValueError:
             pass
-
     if args.get("search"):
         term = f"%{args['search']}%"
         query = query.filter(
@@ -89,12 +81,8 @@ def get_stats():
         return err
 
     total = AuditLog.query.count()
-    by_action = db.session.query(
-        AuditLog.action_type, db.func.count(AuditLog.id)
-    ).group_by(AuditLog.action_type).all()
-    by_entity = db.session.query(
-        AuditLog.entity_type, db.func.count(AuditLog.id)
-    ).group_by(AuditLog.entity_type).all()
+    by_action = db.session.query(AuditLog.action_type, db.func.count(AuditLog.id)).group_by(AuditLog.action_type).all()
+    by_entity = db.session.query(AuditLog.entity_type, db.func.count(AuditLog.id)).group_by(AuditLog.entity_type).all()
 
     return jsonify({
         "total": total,
@@ -110,34 +98,22 @@ def export_csv():
     if err:
         return err
 
-    query = build_query(request.args)
-    logs = query.all()
-
+    logs = build_query(request.args).all()
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow([
-        "ID", "Admin User", "Action Type", "Entity Type", "Entity ID",
-        "Entity Name", "Description", "IP Address", "Timestamp"
-    ])
+    writer.writerow(["ID", "Utilisateur", "Action", "Entité", "ID Entité", "Nom Entité", "Description", "IP", "Horodatage"])
     for log in logs:
         writer.writerow([
             log.id,
             log.admin_user.username if log.admin_user else "",
-            log.action_type,
-            log.entity_type,
-            log.entity_id or "",
-            log.entity_name or "",
-            log.description or "",
-            log.ip_address or "",
+            log.action_type, log.entity_type,
+            log.entity_id or "", log.entity_name or "",
+            log.description or "", log.ip_address or "",
             log.timestamp.isoformat() if log.timestamp else "",
         ])
-
     output.seek(0)
-    return Response(
-        output.getvalue(),
-        mimetype="text/csv",
-        headers={"Content-Disposition": "attachment; filename=audit_logs.csv"},
-    )
+    return Response(output.getvalue(), mimetype="text/csv",
+                    headers={"Content-Disposition": "attachment; filename=journal_audit.csv"})
 
 
 @audit_bp.route("/export/json", methods=["GET"])
@@ -147,15 +123,10 @@ def export_json():
     if err:
         return err
 
-    query = build_query(request.args)
-    logs = query.all()
-
-    data = json.dumps([log.to_dict() for log in logs], indent=2, default=str)
-    return Response(
-        data,
-        mimetype="application/json",
-        headers={"Content-Disposition": "attachment; filename=audit_logs.json"},
-    )
+    logs = build_query(request.args).all()
+    data = json.dumps([log.to_dict() for log in logs], indent=2, default=str, ensure_ascii=False)
+    return Response(data, mimetype="application/json",
+                    headers={"Content-Disposition": "attachment; filename=journal_audit.json"})
 
 
 @audit_bp.route("/export/xlsx", methods=["GET"])
@@ -168,49 +139,43 @@ def export_xlsx():
     import openpyxl
     from openpyxl.styles import Font, PatternFill, Alignment
 
-    query = build_query(request.args)
-    logs = query.all()
-
+    logs = build_query(request.args).all()
     wb = openpyxl.Workbook()
     ws = wb.active
-    ws.title = "Audit Logs"
+    ws.title = "Journal d'audit"
 
-    headers = ["ID", "Admin User", "Action Type", "Entity Type", "Entity ID",
-               "Entity Name", "Description", "IP Address", "Timestamp"]
+    headers = ["ID", "Utilisateur", "Action", "Entité", "ID Entité", "Nom Entité", "Description", "IP", "Horodatage"]
+    hfill = PatternFill(start_color="1a56db", end_color="1a56db", fill_type="solid")
+    hfont = Font(color="FFFFFF", bold=True)
 
-    header_fill = PatternFill(start_color="1E3A5F", end_color="1E3A5F", fill_type="solid")
-    header_font = Font(color="FFFFFF", bold=True)
-
-    for col, header in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=col, value=header)
-        cell.fill = header_fill
-        cell.font = header_font
+    for col, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=h)
+        cell.fill = hfill
+        cell.font = hfont
         cell.alignment = Alignment(horizontal="center")
 
-    for row_idx, log in enumerate(logs, 2):
-        ws.cell(row=row_idx, column=1, value=log.id)
-        ws.cell(row=row_idx, column=2, value=log.admin_user.username if log.admin_user else "")
-        ws.cell(row=row_idx, column=3, value=log.action_type)
-        ws.cell(row=row_idx, column=4, value=log.entity_type)
-        ws.cell(row=row_idx, column=5, value=log.entity_id or "")
-        ws.cell(row=row_idx, column=6, value=log.entity_name or "")
-        ws.cell(row=row_idx, column=7, value=log.description or "")
-        ws.cell(row=row_idx, column=8, value=log.ip_address or "")
-        ws.cell(row=row_idx, column=9, value=log.timestamp.isoformat() if log.timestamp else "")
+    for row_i, log in enumerate(logs, 2):
+        ws.cell(row=row_i, column=1, value=log.id)
+        ws.cell(row=row_i, column=2, value=log.admin_user.username if log.admin_user else "")
+        ws.cell(row=row_i, column=3, value=log.action_type)
+        ws.cell(row=row_i, column=4, value=log.entity_type)
+        ws.cell(row=row_i, column=5, value=log.entity_id or "")
+        ws.cell(row=row_i, column=6, value=log.entity_name or "")
+        ws.cell(row=row_i, column=7, value=log.description or "")
+        ws.cell(row=row_i, column=8, value=log.ip_address or "")
+        ws.cell(row=row_i, column=9, value=log.timestamp.isoformat() if log.timestamp else "")
 
     for col in ws.columns:
-        max_length = max((len(str(cell.value or "")) for cell in col), default=10)
-        ws.column_dimensions[col[0].column_letter].width = min(max_length + 4, 50)
+        ws.column_dimensions[col[0].column_letter].width = min(
+            max(len(str(c.value or "")) for c in col) + 4, 50
+        )
 
     output = io.BytesIO()
     wb.save(output)
     output.seek(0)
-
-    return Response(
-        output.getvalue(),
-        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": "attachment; filename=audit_logs.xlsx"},
-    )
+    return Response(output.getvalue(),
+                    mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": "attachment; filename=journal_audit.xlsx"})
 
 
 @audit_bp.route("/action-types", methods=["GET"])
@@ -219,7 +184,6 @@ def get_action_types():
     admin, err = require_admin()
     if err:
         return err
-
     types = db.session.query(AuditLog.action_type).distinct().all()
     return jsonify([t[0] for t in types]), 200
 
@@ -230,6 +194,5 @@ def get_entity_types():
     admin, err = require_admin()
     if err:
         return err
-
     types = db.session.query(AuditLog.entity_type).distinct().all()
     return jsonify([t[0] for t in types]), 200

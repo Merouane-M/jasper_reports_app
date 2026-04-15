@@ -2,115 +2,103 @@ import { useState, useEffect, useCallback } from 'react'
 import {
   Activity, Filter, Download, ChevronLeft, ChevronRight,
   X, Search, FileText, FileSpreadsheet, Code2, Loader2,
-  ChevronDown, Eye
+  ChevronDown, Eye, BarChart3
 } from 'lucide-react'
 import api from '../utils/api'
 import { AuditLog, PaginatedAuditLogs, AuditStats, User } from '../types'
 
-const ACTION_COLORS: Record<string, string> = {
-  CREATE_REPORT: 'badge-green',
-  UPDATE_REPORT: 'badge-blue',
-  DELETE_REPORT: 'badge-red',
-  TOGGLE_VISIBILITY: 'badge-amber',
-  TOGGLE_PUBLIC: 'badge-amber',
-  CREATE_USER: 'badge-green',
-  UPDATE_USER: 'badge-blue',
-  DEACTIVATE_USER: 'badge-red',
-  ACTIVATE_USER: 'badge-green',
-  CHANGE_ROLE: 'badge-amber',
-  GRANT_ACCESS: 'badge-green',
-  REVOKE_ACCESS: 'badge-red',
-  LOGIN_SUCCESS: 'badge-blue',
-  LOGIN_FAILED: 'badge-red',
-  ADD_PARAMETER: 'badge-green',
-  UPDATE_PARAMETER: 'badge-blue',
-  DELETE_PARAMETER: 'badge-red',
+const ACTION_BADGE: Record<string, string> = {
+  CREATE_REPORT:'badge-green', UPDATE_REPORT:'badge-blue', DELETE_REPORT:'badge-red',
+  TOGGLE_VISIBILITY:'badge-amber', TOGGLE_PUBLIC:'badge-amber',
+  CREATE_USER:'badge-green', UPDATE_USER:'badge-blue',
+  DEACTIVATE_USER:'badge-red', ACTIVATE_USER:'badge-green',
+  CHANGE_ROLE:'badge-amber', PASSWORD_CHANGED:'badge-purple',
+  GRANT_ACCESS:'badge-green', REVOKE_ACCESS:'badge-red',
+  GRANT_ROLE_ACCESS:'badge-green', REVOKE_ROLE_ACCESS:'badge-red',
+  LOGIN_SUCCESS:'badge-blue', LOGIN_FAILED:'badge-red',
+  CREATE_ROLE:'badge-green', UPDATE_ROLE:'badge-blue', DELETE_ROLE:'badge-red',
+}
+
+const ACTION_FR: Record<string, string> = {
+  CREATE_REPORT:'Créer rapport', UPDATE_REPORT:'Modifier rapport', DELETE_REPORT:'Supprimer rapport',
+  TOGGLE_VISIBILITY:'Basculer visibilité', TOGGLE_PUBLIC:'Basculer accès',
+  CREATE_USER:'Créer utilisateur', UPDATE_USER:'Modifier utilisateur',
+  DEACTIVATE_USER:'Désactiver utilisateur', ACTIVATE_USER:'Activer utilisateur',
+  CHANGE_ROLE:'Changer rôle', PASSWORD_CHANGED:'Mot de passe modifié',
+  GRANT_ACCESS:'Accorder accès', REVOKE_ACCESS:'Révoquer accès',
+  GRANT_ROLE_ACCESS:'Accorder accès (rôle)', REVOKE_ROLE_ACCESS:'Révoquer accès (rôle)',
+  LOGIN_SUCCESS:'Connexion réussie', LOGIN_FAILED:'Connexion échouée',
+  CREATE_ROLE:'Créer rôle', UPDATE_ROLE:'Modifier rôle', DELETE_ROLE:'Supprimer rôle',
 }
 
 export default function AuditLogsPage() {
-  const [data, setData] = useState<PaginatedAuditLogs | null>(null)
-  const [stats, setStats] = useState<AuditStats | null>(null)
-  const [users, setUsers] = useState<User[]>([])
+  const [data,    setData]    = useState<PaginatedAuditLogs|null>(null)
+  const [stats,   setStats]   = useState<AuditStats|null>(null)
+  const [users,   setUsers]   = useState<User[]>([])
   const [actionTypes, setActionTypes] = useState<string[]>([])
   const [entityTypes, setEntityTypes] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
-  const [detailLog, setDetailLog] = useState<AuditLog | null>(null)
+  const [detailLog, setDetailLog] = useState<AuditLog|null>(null)
 
   const [filters, setFilters] = useState({
-    page: 1, per_page: 20, search: '',
-    admin_user_id: '', action_type: '', entity_type: '',
-    date_from: '', date_to: '',
+    page:1, per_page:20, search:'',
+    admin_user_id:'', action_type:'', entity_type:'',
+    date_from:'', date_to:'',
   })
 
   const buildParams = useCallback(() => {
-    const p: Record<string, string> = { page: String(filters.page), per_page: String(filters.per_page) }
-    if (filters.search) p.search = filters.search
+    const p: Record<string,string> = { page:String(filters.page), per_page:String(filters.per_page) }
+    if (filters.search)       p.search        = filters.search
     if (filters.admin_user_id) p.admin_user_id = filters.admin_user_id
-    if (filters.action_type) p.action_type = filters.action_type
-    if (filters.entity_type) p.entity_type = filters.entity_type
-    if (filters.date_from) p.date_from = filters.date_from
-    if (filters.date_to) p.date_to = filters.date_to
+    if (filters.action_type)  p.action_type   = filters.action_type
+    if (filters.entity_type)  p.entity_type   = filters.entity_type
+    if (filters.date_from)    p.date_from      = filters.date_from
+    if (filters.date_to)      p.date_to        = filters.date_to
     return new URLSearchParams(p).toString()
   }, [filters])
 
   const fetchLogs = useCallback(async () => {
     setLoading(true)
-    try {
-      const res = await api.get(`/audit/?${buildParams()}`)
-      setData(res.data)
-    } finally {
-      setLoading(false)
-    }
+    try { const r = await api.get(`/audit/?${buildParams()}`); setData(r.data) }
+    finally { setLoading(false) }
   }, [buildParams])
 
+  useEffect(() => { fetchLogs() }, [fetchLogs])
   useEffect(() => {
-    fetchLogs()
-  }, [fetchLogs])
-
-  useEffect(() => {
-    api.get('/audit/stats').then(res => setStats(res.data))
-    api.get('/users/').then(res => setUsers(res.data))
-    api.get('/audit/action-types').then(res => setActionTypes(res.data))
-    api.get('/audit/entity-types').then(res => setEntityTypes(res.data))
+    api.get('/audit/stats').then(r=>setStats(r.data))
+    api.get('/users/').then(r=>setUsers(r.data))
+    api.get('/audit/action-types').then(r=>setActionTypes(r.data))
+    api.get('/audit/entity-types').then(r=>setEntityTypes(r.data))
   }, [])
 
-  const exportLogs = async (format: 'csv' | 'json' | 'xlsx') => {
-    const res = await api.get(`/audit/export/${format}?${buildParams()}`, { responseType: 'blob' })
-    const url = URL.createObjectURL(new Blob([res.data]))
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `audit_logs.${format}`
-    a.click()
+  const exportLogs = async (fmt:'csv'|'json'|'xlsx') => {
+    const r = await api.get(`/audit/export/${fmt}?${buildParams()}`, { responseType:'blob' })
+    const url = URL.createObjectURL(new Blob([r.data]))
+    const a = document.createElement('a'); a.href=url; a.download=`journal_audit.${fmt}`; a.click()
     URL.revokeObjectURL(url)
   }
 
-  const resetFilters = () => {
-    setFilters({ page: 1, per_page: 20, search: '', admin_user_id: '', action_type: '', entity_type: '', date_from: '', date_to: '' })
-  }
+  const fmtDate = (ts:string) => new Date(ts).toLocaleString('fr-FR', {
+    day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'
+  })
 
-  const formatTimestamp = (ts: string) => {
-    const d = new Date(ts)
-    return d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-  }
+  const S_label: React.CSSProperties = { display:'block', fontSize:'0.72rem', fontWeight:600, color:'var(--text-muted)', marginBottom:4, textTransform:'uppercase', letterSpacing:'0.05em' }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+    <div style={{ padding:'1.5rem', maxWidth:1300, margin:'0 auto' }}>
+      {/* Header */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'1.5rem', flexWrap:'wrap', gap:'0.75rem' }}>
         <div>
-          <h1 className="section-title flex items-center gap-2">
-            <Activity className="w-5 h-5 text-accent-400" />Audit Logs
+          <h1 className="page-title" style={{ display:'flex', alignItems:'center', gap:8 }}>
+            <Activity size={22} style={{ color:'var(--brand)' }} />Journal d'audit
           </h1>
-          <p className="text-slate-500 text-sm mt-1">Immutable record of all administrative actions</p>
+          <p className="page-sub">Historique immuable de toutes les actions administratives</p>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-600 mr-1">Export:</span>
-          {[
-            { fmt: 'csv' as const, icon: FileText, label: 'CSV' },
-            { fmt: 'xlsx' as const, icon: FileSpreadsheet, label: 'XLSX' },
-            { fmt: 'json' as const, icon: Code2, label: 'JSON' },
-          ].map(({ fmt, icon: Icon, label }) => (
-            <button key={fmt} onClick={() => exportLogs(fmt)} className="btn-secondary py-1.5 px-3 text-xs">
-              <Icon className="w-3.5 h-3.5" />{label}
+        <div style={{ display:'flex', alignItems:'center', gap:'0.5rem' }}>
+          <span style={{ fontSize:'0.75rem', color:'var(--text-muted)' }}>Exporter :</span>
+          {([['csv', <FileText size={14}/>, 'CSV'], ['xlsx', <FileSpreadsheet size={14}/>, 'Excel'], ['json', <Code2 size={14}/>, 'JSON']] as const).map(([fmt, icon, label]) => (
+            <button key={fmt} className="btn-secondary" style={{ padding:'0.35rem 0.625rem', fontSize:'0.75rem' }} onClick={() => exportLogs(fmt)}>
+              {icon}{label}
             </button>
           ))}
         </div>
@@ -118,148 +106,155 @@ export default function AuditLogsPage() {
 
       {/* Stats */}
       {stats && (
-        <div className="grid grid-cols-4 gap-4 mb-6">
-          <div className="card text-center">
-            <p className="font-display text-3xl font-bold text-white">{stats.total.toLocaleString()}</p>
-            <p className="text-slate-500 text-xs mt-1">Total Events</p>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(160px,1fr))', gap:'0.75rem', marginBottom:'1.25rem' }}>
+          <div className="card" style={{ textAlign:'center' }}>
+            <div style={{ fontFamily:'Outfit', fontSize:'1.8rem', fontWeight:800, color:'var(--text-primary)' }}>{stats.total.toLocaleString('fr-FR')}</div>
+            <div style={{ fontSize:'0.75rem', color:'var(--text-muted)', marginTop:4 }}>Événements total</div>
           </div>
-          {stats.by_action.slice(0, 3).map(a => (
+          {stats.by_action.slice(0,3).map(a => (
             <div key={a.action} className="card">
-              <p className="font-display text-2xl font-bold text-accent-400">{a.count}</p>
-              <p className="text-slate-500 text-xs mt-1 truncate">{a.action.replace(/_/g, ' ')}</p>
+              <div style={{ fontFamily:'Outfit', fontSize:'1.5rem', fontWeight:800, color:'var(--brand)' }}>{a.count}</div>
+              <div style={{ fontSize:'0.72rem', color:'var(--text-muted)', marginTop:4, lineHeight:1.3 }}>
+                {ACTION_FR[a.action] || a.action.replace(/_/g,' ')}
+              </div>
             </div>
           ))}
         </div>
       )}
 
       {/* Filters */}
-      <div className="card mb-5">
-        <div className="flex items-center gap-2 mb-3">
-          <Filter className="w-4 h-4 text-slate-500" />
-          <h3 className="text-sm font-medium text-slate-400">Filters</h3>
-          <button onClick={resetFilters} className="ml-auto text-xs text-slate-600 hover:text-slate-400 transition-colors">
-            Clear all
+      <div className="card" style={{ marginBottom:'1rem' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:'0.75rem' }}>
+          <Filter size={14} style={{ color:'var(--text-muted)' }} />
+          <span style={{ fontSize:'0.85rem', fontWeight:600, color:'var(--text-secondary)' }}>Filtres</span>
+          <button onClick={() => setFilters({ page:1,per_page:20,search:'',admin_user_id:'',action_type:'',entity_type:'',date_from:'',date_to:'' })}
+            style={{ marginLeft:'auto', background:'none', border:'none', cursor:'pointer', fontSize:'0.75rem', color:'var(--text-muted)', textDecoration:'underline' }}>
+            Réinitialiser
           </button>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          <div className="relative lg:col-span-2">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
-            <input className="input-field pl-8 py-2 text-xs" placeholder="Search logs..."
-              value={filters.search} onChange={e => setFilters({...filters, search: e.target.value, page: 1})} />
+        <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr 1fr 1fr', gap:'0.625rem', alignItems:'end' }}>
+          <div>
+            <label style={S_label}>Recherche</label>
+            <div style={{ position:'relative' }}>
+              <Search size={13} style={{ position:'absolute', left:9, top:'50%', transform:'translateY(-50%)', color:'var(--text-muted)' }} />
+              <input className="input-field" style={{ paddingLeft:28, fontSize:'0.82rem' }}
+                placeholder="Rechercher…"
+                value={filters.search} onChange={e => setFilters({...filters,search:e.target.value,page:1})} />
+            </div>
           </div>
-
           {[
-            {
-              key: 'admin_user_id', placeholder: 'All users',
-              options: users.map(u => ({ value: String(u.id), label: u.username }))
-            },
-            {
-              key: 'action_type', placeholder: 'All actions',
-              options: actionTypes.map(a => ({ value: a, label: a.replace(/_/g, ' ') }))
-            },
-            {
-              key: 'entity_type', placeholder: 'All entities',
-              options: entityTypes.map(e => ({ value: e, label: e }))
-            },
-          ].map(({ key, placeholder, options }) => (
-            <div key={key} className="relative">
-              <select className="input-field appearance-none pr-7 py-2 text-xs"
-                value={filters[key as keyof typeof filters]}
-                onChange={e => setFilters({...filters, [key]: e.target.value, page: 1})}>
-                <option value="">{placeholder}</option>
-                {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500 pointer-events-none" />
+            { key:'admin_user_id', label:'Utilisateur', opts: users.map(u=>({v:String(u.id),l:u.username})) },
+            { key:'action_type',   label:'Action',      opts: actionTypes.map(a=>({v:a,l:ACTION_FR[a]||a})) },
+            { key:'entity_type',   label:'Entité',      opts: entityTypes.map(e=>({v:e,l:e})) },
+          ].map(({ key, label, opts }) => (
+            <div key={key}>
+              <label style={S_label}>{label}</label>
+              <div style={{ position:'relative' }}>
+                <select className="input-field" style={{ appearance:'none', paddingRight:24, fontSize:'0.82rem' }}
+                  value={filters[key as keyof typeof filters]}
+                  onChange={e => setFilters({...filters,[key]:e.target.value,page:1})}>
+                  <option value="">Tous</option>
+                  {opts.map(o=><option key={o.v} value={o.v}>{o.l}</option>)}
+                </select>
+                <ChevronDown size={12} style={{ position:'absolute', right:7, top:'50%', transform:'translateY(-50%)', color:'var(--text-muted)', pointerEvents:'none' }} />
+              </div>
             </div>
           ))}
-
-          <div className="flex gap-2">
-            <input type="date" className="input-field py-2 text-xs flex-1"
-              value={filters.date_from} onChange={e => setFilters({...filters, date_from: e.target.value, page: 1})}
-              title="From date" />
+          <div>
+            <label style={S_label}>Du</label>
+            <input type="date" className="input-field" style={{ fontSize:'0.82rem' }}
+              value={filters.date_from} onChange={e => setFilters({...filters,date_from:e.target.value,page:1})} />
           </div>
-        </div>
-        <div className="mt-2">
-          <input type="date" className="input-field py-2 text-xs w-48"
-            value={filters.date_to} onChange={e => setFilters({...filters, date_to: e.target.value, page: 1})}
-            title="To date" />
+          <div>
+            <label style={S_label}>Au</label>
+            <input type="date" className="input-field" style={{ fontSize:'0.82rem' }}
+              value={filters.date_to} onChange={e => setFilters({...filters,date_to:e.target.value,page:1})} />
+          </div>
         </div>
       </div>
 
       {/* Table */}
-      <div className="card overflow-hidden p-0">
+      <div className="card" style={{ padding:0, overflow:'hidden' }}>
         {loading ? (
-          <div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 text-accent-400 animate-spin" /></div>
+          <div style={{ display:'flex', justifyContent:'center', padding:'4rem' }}>
+            <Loader2 size={28} style={{ color:'var(--brand)', animation:'spin 0.7s linear infinite' }} />
+          </div>
         ) : (
           <>
-            <table className="w-full">
-              <thead className="border-b border-slate-800/60">
-                <tr>
-                  {['Time', 'Admin', 'Action', 'Entity', 'Description', 'IP', ''].map(h => (
-                    <th key={h} className="table-head">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {data?.logs.map(log => (
-                  <tr key={log.id} className="table-row">
-                    <td className="table-cell text-xs text-slate-500 whitespace-nowrap">
-                      {formatTimestamp(log.timestamp)}
-                    </td>
-                    <td className="table-cell">
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-5 h-5 rounded-full bg-accent-500/15 flex items-center justify-center shrink-0">
-                          <span className="text-accent-400 text-[9px] font-bold uppercase">{log.admin_username?.[0]}</span>
-                        </div>
-                        <span className="text-sm text-slate-300">{log.admin_username}</span>
-                      </div>
-                    </td>
-                    <td className="table-cell">
-                      <span className={`badge ${ACTION_COLORS[log.action_type] || 'badge-slate'} text-[10px]`}>
-                        {log.action_type.replace(/_/g, ' ')}
-                      </span>
-                    </td>
-                    <td className="table-cell">
-                      <div>
-                        <span className="badge badge-slate text-[10px]">{log.entity_type}</span>
-                        {log.entity_name && <p className="text-xs text-slate-600 mt-0.5 truncate max-w-28">{log.entity_name}</p>}
-                      </div>
-                    </td>
-                    <td className="table-cell text-xs text-slate-400 max-w-52 truncate">{log.description}</td>
-                    <td className="table-cell text-xs text-slate-600 font-mono">{log.ip_address}</td>
-                    <td className="table-cell">
-                      {(log.changes_before || log.changes_after) && (
-                        <button onClick={() => setDetailLog(log)}
-                          className="p-1.5 text-slate-600 hover:text-accent-400 transition-colors">
-                          <Eye className="w-4 h-4" />
-                        </button>
-                      )}
-                    </td>
+            <div style={{ overflowX:'auto' }}>
+              <table style={{ width:'100%', borderCollapse:'collapse', minWidth:800 }}>
+                <thead>
+                  <tr>
+                    {['Horodatage','Utilisateur','Action','Entité','Description','IP',''].map(h=>(
+                      <th key={h} className="th">{h}</th>
+                    ))}
                   </tr>
-                ))}
-                {(!data?.logs.length) && (
-                  <tr><td colSpan={7} className="text-center py-12 text-slate-600">No audit logs found</td></tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {data?.logs.map(log => (
+                    <tr key={log.id}>
+                      <td className="td" style={{ fontSize:'0.78rem', color:'var(--text-muted)', whiteSpace:'nowrap' }}>
+                        {fmtDate(log.timestamp)}
+                      </td>
+                      <td className="td">
+                        <div style={{ display:'flex', alignItems:'center', gap:7 }}>
+                          <div style={{ width:24, height:24, borderRadius:'50%', background:'var(--brand-light)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                            <span style={{ color:'var(--brand)', fontSize:'0.65rem', fontWeight:800, textTransform:'uppercase' }}>{log.admin_username?.[0]}</span>
+                          </div>
+                          <span style={{ fontSize:'0.875rem', fontWeight:600, color:'var(--text-primary)' }}>{log.admin_username}</span>
+                        </div>
+                      </td>
+                      <td className="td">
+                        <span className={`badge ${ACTION_BADGE[log.action_type]||'badge-slate'}`} style={{ fontSize:'0.68rem' }}>
+                          {ACTION_FR[log.action_type] || log.action_type}
+                        </span>
+                      </td>
+                      <td className="td">
+                        <div>
+                          <span className="badge badge-slate" style={{ fontSize:'0.68rem' }}>{log.entity_type}</span>
+                          {log.entity_name && <div style={{ fontSize:'0.72rem', color:'var(--text-muted)', marginTop:3, maxWidth:140, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{log.entity_name}</div>}
+                        </div>
+                      </td>
+                      <td className="td" style={{ fontSize:'0.8rem', color:'var(--text-secondary)', maxWidth:220, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                        {log.description}
+                      </td>
+                      <td className="td" style={{ fontSize:'0.75rem', color:'var(--text-muted)', fontFamily:'JetBrains Mono' }}>
+                        {log.ip_address}
+                      </td>
+                      <td className="td">
+                        {(log.changes_before || log.changes_after) && (
+                          <button onClick={() => setDetailLog(log)} style={{ background:'none', border:'none', cursor:'pointer', padding:5, borderRadius:6, color:'var(--text-muted)', display:'flex' }}
+                            onMouseEnter={e=>(e.currentTarget.style.color='var(--brand)')} onMouseLeave={e=>(e.currentTarget.style.color='var(--text-muted)')}>
+                            <Eye size={15}/>
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {!data?.logs.length && (
+                    <tr><td colSpan={7} style={{ textAlign:'center', padding:'3rem', color:'var(--text-muted)' }}>
+                      Aucune entrée trouvée
+                    </td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
 
             {/* Pagination */}
             {data && data.pages > 1 && (
-              <div className="flex items-center justify-between px-4 py-3 border-t border-slate-800/60">
-                <p className="text-xs text-slate-600">
-                  Showing {((filters.page - 1) * filters.per_page) + 1}–{Math.min(filters.page * filters.per_page, data.total)} of {data.total}
-                </p>
-                <div className="flex items-center gap-2">
-                  <button disabled={filters.page <= 1}
-                    onClick={() => setFilters(f => ({ ...f, page: f.page - 1 }))}
-                    className="btn-secondary py-1.5 px-2 text-xs disabled:opacity-40">
-                    <ChevronLeft className="w-4 h-4" />
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0.75rem 1rem', borderTop:'1px solid var(--border)' }}>
+                <span style={{ fontSize:'0.78rem', color:'var(--text-muted)' }}>
+                  {((filters.page-1)*filters.per_page)+1}–{Math.min(filters.page*filters.per_page, data.total)} sur {data.total.toLocaleString('fr-FR')} entrées
+                </span>
+                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <button className="btn-secondary" style={{ padding:'0.3rem 0.5rem' }}
+                    disabled={filters.page<=1} onClick={()=>setFilters(f=>({...f,page:f.page-1}))}>
+                    <ChevronLeft size={15}/>
                   </button>
-                  <span className="text-xs text-slate-500">Page {filters.page} of {data.pages}</span>
-                  <button disabled={filters.page >= data.pages}
-                    onClick={() => setFilters(f => ({ ...f, page: f.page + 1 }))}
-                    className="btn-secondary py-1.5 px-2 text-xs disabled:opacity-40">
-                    <ChevronRight className="w-4 h-4" />
+                  <span style={{ fontSize:'0.8rem', color:'var(--text-secondary)' }}>Page {filters.page} / {data.pages}</span>
+                  <button className="btn-secondary" style={{ padding:'0.3rem 0.5rem' }}
+                    disabled={filters.page>=data.pages} onClick={()=>setFilters(f=>({...f,page:f.page+1}))}>
+                    <ChevronRight size={15}/>
                   </button>
                 </div>
               </div>
@@ -270,40 +265,43 @@ export default function AuditLogsPage() {
 
       {/* Detail modal */}
       {detailLog && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="glass rounded-2xl w-full max-w-lg animate-fade-in">
-            <div className="flex items-center justify-between p-5 border-b border-slate-800/60">
+        <div className="modal-overlay">
+          <div className="modal-box" style={{ maxWidth:540 }}>
+            <div className="modal-header">
               <div>
-                <h2 className="font-display font-bold text-white">Change Details</h2>
-                <p className="text-xs text-slate-500 mt-0.5">{detailLog.action_type} · {formatTimestamp(detailLog.timestamp)}</p>
+                <h2 style={{ fontFamily:'Outfit', fontWeight:700, margin:0, color:'var(--text-primary)' }}>Détail des changements</h2>
+                <p style={{ fontSize:'0.78rem', color:'var(--text-muted)', margin:'0.2rem 0 0' }}>
+                  {ACTION_FR[detailLog.action_type] || detailLog.action_type} · {fmtDate(detailLog.timestamp)}
+                </p>
               </div>
-              <button onClick={() => setDetailLog(null)} className="text-slate-500 hover:text-white"><X className="w-5 h-5" /></button>
+              <button onClick={() => setDetailLog(null)} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text-muted)', display:'flex', padding:4 }}><X size={18}/></button>
             </div>
-            <div className="p-5 space-y-4 max-h-96 overflow-y-auto scroll-custom">
+            <div className="modal-body scroll-thin" style={{ display:'flex', flexDirection:'column', gap:'1rem', maxHeight:400 }}>
               {detailLog.changes_before && (
                 <div>
-                  <p className="text-xs font-semibold text-red-400 uppercase tracking-wider mb-2">Before</p>
-                  <pre className="bg-navy-800/60 rounded-lg p-3 text-xs text-slate-400 overflow-x-auto font-mono">
+                  <p style={{ fontSize:'0.72rem', fontWeight:700, color:'#dc2626', textTransform:'uppercase', letterSpacing:'0.05em', margin:'0 0 6px' }}>Avant</p>
+                  <pre style={{ background:'var(--bg-surface-2)', border:'1px solid var(--border)', borderRadius:8, padding:'0.75rem', fontSize:'0.75rem', color:'var(--text-secondary)', overflowX:'auto', margin:0, fontFamily:'JetBrains Mono', lineHeight:1.5 }}>
                     {JSON.stringify(detailLog.changes_before, null, 2)}
                   </pre>
                 </div>
               )}
               {detailLog.changes_after && (
                 <div>
-                  <p className="text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-2">After</p>
-                  <pre className="bg-navy-800/60 rounded-lg p-3 text-xs text-slate-400 overflow-x-auto font-mono">
+                  <p style={{ fontSize:'0.72rem', fontWeight:700, color:'#15803d', textTransform:'uppercase', letterSpacing:'0.05em', margin:'0 0 6px' }}>Après</p>
+                  <pre style={{ background:'var(--bg-surface-2)', border:'1px solid var(--border)', borderRadius:8, padding:'0.75rem', fontSize:'0.75rem', color:'var(--text-secondary)', overflowX:'auto', margin:0, fontFamily:'JetBrains Mono', lineHeight:1.5 }}>
                     {JSON.stringify(detailLog.changes_after, null, 2)}
                   </pre>
                 </div>
               )}
-              <div className="text-xs text-slate-600 space-y-1 pt-2 border-t border-slate-800/60">
-                <p>User Agent: {detailLog.user_agent || 'N/A'}</p>
-                <p>Log ID: #{detailLog.id}</p>
+              <div style={{ borderTop:'1px solid var(--border)', paddingTop:'0.75rem', fontSize:'0.75rem', color:'var(--text-muted)', display:'flex', flexDirection:'column', gap:4 }}>
+                <div>Navigateur : {detailLog.user_agent || '—'}</div>
+                <div>ID entrée : #{detailLog.id}</div>
               </div>
             </div>
           </div>
         </div>
       )}
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   )
 }

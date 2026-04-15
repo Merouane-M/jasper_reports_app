@@ -1,153 +1,146 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit2, X, Save, CheckCircle, AlertCircle, Loader2, UserCheck, UserX, ShieldCheck } from 'lucide-react'
+import { Plus, Edit2, X, Save, UserCheck, UserX, ShieldCheck, Loader2, AlertCircle, CheckCircle } from 'lucide-react'
 import api from '../utils/api'
-import { User } from '../types'
+import { User, Role } from '../types'
+
+function Toast({ msg, type, onClose }: { msg:string; type:'success'|'error'; onClose:()=>void }) {
+  return (
+    <div className={`toast ${type==='success'?'toast-success':'toast-error'}`} onClick={onClose} style={{ cursor:'pointer' }}>
+      {type==='success'?<CheckCircle size={16}/>:<AlertCircle size={16}/>}{msg}
+    </div>
+  )
+}
 
 export default function AdminUsersPage() {
-  const [users, setUsers] = useState<User[]>([])
+  const [users, setUsers]   = useState<User[]>([])
+  const [roles, setRoles]   = useState<Role[]>([])
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<User | null>(null)
-  const [form, setForm] = useState({ username: '', email: '', password: '', role: 'user' })
-  const [toast, setToast] = useState<{msg: string, type: 'success'|'error'} | null>(null)
+  const [form, setForm] = useState({ username:'', email:'', password:'', role_id:0 })
+  const [formError, setFormError] = useState('')
+  const [toast, setToast] = useState<{ msg:string; type:'success'|'error' }|null>(null)
 
-  const fetchUsers = () => {
-    api.get('/users/').then(res => setUsers(res.data)).finally(() => setLoading(false))
+  const fetchData = async () => {
+    const [uRes, rRes] = await Promise.all([api.get('/users/'), api.get('/roles/')])
+    setUsers(uRes.data); setRoles(rRes.data)
+    setLoading(false)
+  }
+  useEffect(() => { fetchData() }, [])
+
+  const showToast = (msg:string, type:'success'|'error'='success') => {
+    setToast({msg,type}); setTimeout(()=>setToast(null), 3500)
   }
 
-  useEffect(() => { fetchUsers() }, [])
-
-  const showToast = (msg: string, type: 'success'|'error' = 'success') => {
-    setToast({ msg, type })
-    setTimeout(() => setToast(null), 3000)
-  }
+  const defaultRoleId = () => roles.find(r=>r.name==='utilisateur')?.id || roles[0]?.id || 0
 
   const openCreate = () => {
     setEditing(null)
-    setForm({ username: '', email: '', password: '', role: 'user' })
-    setModalOpen(true)
+    setForm({ username:'', email:'', password:'', role_id: defaultRoleId() })
+    setFormError(''); setModalOpen(true)
   }
-
-  const openEdit = (user: User) => {
-    setEditing(user)
-    setForm({ username: user.username, email: user.email, password: '', role: user.role.name })
-    setModalOpen(true)
+  const openEdit = (u: User) => {
+    setEditing(u)
+    setForm({ username:u.username, email:u.email, password:'', role_id:u.role?.id || defaultRoleId() })
+    setFormError(''); setModalOpen(true)
   }
-
-  const saveUser = async () => {
+  const save = async () => {
+    setFormError('')
     try {
       const payload = editing
-        ? { username: form.username, email: form.email, role: form.role }
+        ? { username:form.username, email:form.email, role_id:form.role_id, ...(form.password?{password:form.password}:{}) }
         : form
-      if (editing) {
-        await api.put(`/users/${editing.id}`, payload)
-        showToast('User updated')
-      } else {
-        await api.post('/users/', payload)
-        showToast('User created')
-      }
-      setModalOpen(false)
-      fetchUsers()
-    } catch (err: any) {
-      showToast(err.response?.data?.error || 'Failed to save', 'error')
-    }
+      if (editing) { await api.put(`/users/${editing.id}`, payload); showToast('Utilisateur mis à jour') }
+      else         { await api.post('/users/', payload);               showToast('Utilisateur créé') }
+      setModalOpen(false); fetchData()
+    } catch (err:any) { setFormError(err.response?.data?.error || 'Erreur lors de la sauvegarde') }
   }
-
-  const toggleStatus = async (user: User) => {
-    await api.patch(`/users/${user.id}/toggle-status`)
-    fetchUsers()
-    showToast(`User ${user.is_active ? 'deactivated' : 'activated'}`)
+  const toggleStatus = async (u: User) => {
+    await api.patch(`/users/${u.id}/toggle-status`)
+    fetchData()
+    showToast(u.is_active ? 'Utilisateur désactivé' : 'Utilisateur activé')
   }
 
   const stats = {
     total: users.length,
-    active: users.filter(u => u.is_active).length,
-    admins: users.filter(u => u.role?.name === 'admin').length,
+    active: users.filter(u=>u.is_active).length,
+    admins: users.filter(u=>u.role?.name==='admin').length,
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
-      {toast && (
-        <div className={`fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-medium shadow-lg animate-fade-in ${
-          toast.type === 'success' ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-400' : 'bg-red-500/15 border border-red-500/30 text-red-400'
-        }`}>
-          {toast.type === 'success' ? <CheckCircle className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
-          {toast.msg}
-        </div>
-      )}
+    <div style={{ padding:'1.5rem', maxWidth:1100, margin:'0 auto' }}>
+      {toast && <Toast msg={toast.msg} type={toast.type} onClose={()=>setToast(null)} />}
 
-      <div className="flex items-center justify-between mb-6">
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'1.5rem' }}>
         <div>
-          <h1 className="section-title">Users</h1>
-          <p className="text-slate-500 text-sm mt-1">Manage user accounts and roles</p>
+          <h1 className="page-title">Utilisateurs</h1>
+          <p className="page-sub">Gestion des comptes utilisateurs</p>
         </div>
-        <button onClick={openCreate} className="btn-primary">
-          <Plus className="w-4 h-4" />New User
+        <button className="btn-primary" onClick={openCreate}>
+          <Plus size={15}/>Nouvel utilisateur
         </button>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'0.875rem', marginBottom:'1.25rem' }}>
         {[
-          { label: 'Total Users', value: stats.total, color: 'text-white' },
-          { label: 'Active', value: stats.active, color: 'text-emerald-400' },
-          { label: 'Admins', value: stats.admins, color: 'text-gold-400' },
+          { label:'Total utilisateurs', value:stats.total, color:'var(--text-primary)' },
+          { label:'Comptes actifs', value:stats.active, color:'#15803d' },
+          { label:'Administrateurs', value:stats.admins, color:'var(--brand)' },
         ].map(s => (
-          <div key={s.label} className="card text-center">
-            <p className={`font-display text-3xl font-bold ${s.color}`}>{s.value}</p>
-            <p className="text-slate-500 text-xs mt-1">{s.label}</p>
+          <div key={s.label} className="card" style={{ textAlign:'center' }}>
+            <div style={{ fontFamily:'Outfit', fontSize:'2rem', fontWeight:800, color:s.color }}>{s.value}</div>
+            <div style={{ fontSize:'0.8rem', color:'var(--text-muted)', marginTop:4 }}>{s.label}</div>
           </div>
         ))}
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 text-accent-400 animate-spin" /></div>
+        <div style={{ display:'flex', justifyContent:'center', padding:'4rem' }}>
+          <Loader2 size={28} style={{ color:'var(--brand)', animation:'spin 0.7s linear infinite' }} />
+        </div>
       ) : (
-        <div className="card overflow-hidden p-0">
-          <table className="w-full">
-            <thead className="border-b border-slate-800/60">
+        <div className="card" style={{ padding:0, overflow:'hidden' }}>
+          <table style={{ width:'100%', borderCollapse:'collapse' }}>
+            <thead>
               <tr>
-                {['User', 'Email', 'Role', 'Status', 'Last Login', 'Actions'].map(h => (
-                  <th key={h} className="table-head">{h}</th>
+                {['Utilisateur','E-mail','Rôle','Statut','Dernière connexion','Actions'].map(h=>(
+                  <th key={h} className="th">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {users.map(u => (
-                <tr key={u.id} className="table-row">
-                  <td className="table-cell">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-7 h-7 rounded-full bg-accent-500/15 border border-accent-500/25 flex items-center justify-center shrink-0">
-                        <span className="text-accent-400 text-xs font-bold uppercase">{u.username[0]}</span>
+                <tr key={u.id}>
+                  <td className="td">
+                    <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                      <div style={{ width:30, height:30, borderRadius:'50%', background:'var(--brand-light)', border:'2px solid var(--brand)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                        <span style={{ color:'var(--brand)', fontSize:'0.72rem', fontWeight:800, textTransform:'uppercase' }}>{u.username[0]}</span>
                       </div>
-                      <span className="font-medium text-white text-sm">{u.username}</span>
+                      <span style={{ fontWeight:600, fontSize:'0.875rem', color:'var(--text-primary)' }}>{u.username}</span>
                     </div>
                   </td>
-                  <td className="table-cell text-slate-400">{u.email}</td>
-                  <td className="table-cell">
+                  <td className="td" style={{ color:'var(--text-muted)' }}>{u.email}</td>
+                  <td className="td">
                     {u.role?.name === 'admin'
-                      ? <span className="badge badge-amber"><ShieldCheck className="w-3 h-3" />Admin</span>
-                      : <span className="badge badge-slate">User</span>
+                      ? <span className="badge badge-amber"><ShieldCheck size={11}/>Admin</span>
+                      : <span className="badge badge-blue">{u.role?.name||'—'}</span>
                     }
                   </td>
-                  <td className="table-cell">
-                    {u.is_active
-                      ? <span className="badge badge-green">Active</span>
-                      : <span className="badge badge-red">Inactive</span>
-                    }
+                  <td className="td">
+                    {u.is_active ? <span className="badge badge-green">Actif</span> : <span className="badge badge-red">Inactif</span>}
                   </td>
-                  <td className="table-cell text-slate-500 text-xs">
-                    {u.last_login ? new Date(u.last_login).toLocaleDateString() : 'Never'}
+                  <td className="td" style={{ color:'var(--text-muted)', fontSize:'0.8rem' }}>
+                    {u.last_login ? new Date(u.last_login).toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' }) : '—'}
                   </td>
-                  <td className="table-cell">
-                    <div className="flex items-center gap-1">
-                      <button onClick={() => openEdit(u)} className="p-1.5 text-slate-500 hover:text-white transition-colors">
-                        <Edit2 className="w-4 h-4" />
+                  <td className="td">
+                    <div style={{ display:'flex', gap:4 }}>
+                      <button onClick={() => openEdit(u)} style={{ background:'none', border:'none', cursor:'pointer', padding:5, borderRadius:6, color:'var(--text-muted)', display:'flex' }}>
+                        <Edit2 size={14}/>
                       </button>
-                      <button onClick={() => toggleStatus(u)}
-                        className={`p-1.5 transition-colors ${u.is_active ? 'text-slate-500 hover:text-red-400' : 'text-slate-500 hover:text-emerald-400'}`}
-                        title={u.is_active ? 'Deactivate' : 'Activate'}>
-                        {u.is_active ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
+                      <button onClick={() => toggleStatus(u)} title={u.is_active?'Désactiver':'Activer'}
+                        style={{ background:'none', border:'none', cursor:'pointer', padding:5, borderRadius:6, color:'var(--text-muted)', display:'flex' }}>
+                        {u.is_active ? <UserX size={14}/> : <UserCheck size={14}/>}
                       </button>
                     </div>
                   </td>
@@ -160,45 +153,60 @@ export default function AdminUsersPage() {
 
       {/* Modal */}
       {modalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="glass rounded-2xl w-full max-w-md animate-fade-in">
-            <div className="flex items-center justify-between p-5 border-b border-slate-800/60">
-              <h2 className="font-display font-bold text-white">{editing ? 'Edit User' : 'New User'}</h2>
-              <button onClick={() => setModalOpen(false)} className="text-slate-500 hover:text-white"><X className="w-5 h-5" /></button>
+        <div className="modal-overlay">
+          <div className="modal-box" style={{ maxWidth:440 }}>
+            <div className="modal-header">
+              <h2 style={{ fontFamily:'Outfit', fontWeight:700, margin:0, color:'var(--text-primary)' }}>
+                {editing ? 'Modifier l\'utilisateur' : 'Nouvel utilisateur'}
+              </h2>
+              <button onClick={() => setModalOpen(false)} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text-muted)', display:'flex', padding:4 }}><X size={18}/></button>
             </div>
-            <div className="p-5 space-y-4">
+            <div className="modal-body" style={{ display:'flex', flexDirection:'column', gap:'1rem' }}>
+              {formError && (
+                <div style={{ display:'flex', alignItems:'center', gap:8, background:'#fef2f2', border:'1px solid #fca5a5', borderRadius:8, padding:'0.625rem 0.75rem', fontSize:'0.875rem', color:'#dc2626' }}>
+                  <AlertCircle size={14} style={{ flexShrink:0 }}/>{formError}
+                </div>
+              )}
               {[
-                { key: 'username', label: 'Username', type: 'text' },
-                { key: 'email', label: 'Email', type: 'email' },
-                ...(!editing ? [{ key: 'password', label: 'Password', type: 'password' }] : []),
+                { key:'username', label:"Nom d'utilisateur", type:'text' },
+                { key:'email',    label:'Adresse e-mail',    type:'email' },
               ].map(f => (
                 <div key={f.key}>
-                  <label className="block text-xs font-medium text-slate-400 mb-1.5">{f.label}</label>
+                  <label style={{ display:'block', fontSize:'0.8rem', fontWeight:600, color:'var(--text-secondary)', marginBottom:6 }}>{f.label}</label>
                   <input type={f.type} className="input-field"
-                    value={form[f.key as keyof typeof form]}
-                    onChange={e => setForm({...form, [f.key]: e.target.value})} />
+                    value={form[f.key as 'username'|'email']}
+                    onChange={e => setForm({...form,[f.key]:e.target.value})} />
                 </div>
               ))}
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1.5">Role</label>
-                <div className="relative">
-                  <select className="input-field appearance-none pr-8" value={form.role}
-                    onChange={e => setForm({...form, role: e.target.value})}>
-                    <option value="user">User</option>
-                    <option value="admin">Admin</option>
+                <label style={{ display:'block', fontSize:'0.8rem', fontWeight:600, color:'var(--text-secondary)', marginBottom:6 }}>
+                  {editing ? 'Nouveau mot de passe (laisser vide pour ne pas changer)' : 'Mot de passe *'}
+                </label>
+                <input type="password" className="input-field"
+                  value={form.password} onChange={e => setForm({...form,password:e.target.value})}
+                  required={!editing} />
+              </div>
+              <div>
+                <label style={{ display:'block', fontSize:'0.8rem', fontWeight:600, color:'var(--text-secondary)', marginBottom:6 }}>Rôle</label>
+                <div style={{ position:'relative' }}>
+                  <select className="input-field" style={{ appearance:'none', paddingRight:28 }}
+                    value={form.role_id} onChange={e => setForm({...form,role_id:parseInt(e.target.value)})}>
+                    {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                   </select>
+                  <svg style={{ position:'absolute', right:9, top:'50%', transform:'translateY(-50%)', pointerEvents:'none', color:'var(--text-muted)' }} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 9 6 6 6-6"/></svg>
                 </div>
               </div>
             </div>
-            <div className="flex gap-3 p-5 border-t border-slate-800/60">
-              <button onClick={() => setModalOpen(false)} className="btn-secondary flex-1 justify-center">Cancel</button>
-              <button onClick={saveUser} className="btn-primary flex-1 justify-center">
-                <Save className="w-4 h-4" />{editing ? 'Save' : 'Create'}
+            <div className="modal-footer">
+              <button className="btn-secondary" style={{ flex:1, justifyContent:'center' }} onClick={() => setModalOpen(false)}>Annuler</button>
+              <button className="btn-primary" style={{ flex:1, justifyContent:'center' }} onClick={save}>
+                <Save size={15}/>{editing ? 'Enregistrer' : 'Créer'}
               </button>
             </div>
           </div>
         </div>
       )}
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   )
 }

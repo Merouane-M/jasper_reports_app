@@ -1,7 +1,8 @@
 import { useState, FormEvent } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { Eye, EyeOff, BarChart3, AlertCircle } from 'lucide-react'
+import { useTheme } from '../context/ThemeContext'
+import { Eye, EyeOff, BarChart3, AlertCircle, Sun, Moon } from 'lucide-react'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -10,6 +11,7 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const { login } = useAuth()
+  const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
 
   const handleSubmit = async (e: FormEvent) => {
@@ -18,100 +20,114 @@ export default function LoginPage() {
     setLoading(true)
     try {
       await login(email, password)
-      navigate('/reports')
+      navigate('/rapports')
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Login failed. Please try again.')
+      setError(err.response?.data?.error || 'Connexion impossible. Vérifiez vos identifiants.')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-navy-950 bg-grid flex items-center justify-center p-4">
-      {/* Background blobs */}
-      <div className="absolute top-0 left-1/4 w-96 h-96 bg-accent-500/5 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-600/5 rounded-full blur-3xl pointer-events-none" />
+    <div style={{ minHeight:'100vh', background:'var(--bg-base)', display:'flex', alignItems:'center', justifyContent:'center', padding:'1rem', position:'relative' }}>
 
-      <div className="w-full max-w-sm animate-fade-in">
-        {/* Logo */}
-        <div className="flex items-center justify-center gap-3 mb-8">
-          <div className="w-10 h-10 bg-accent-500/15 border border-accent-500/30 rounded-xl flex items-center justify-center">
-            <BarChart3 className="w-5 h-5 text-accent-400" />
+      {/* Theme toggle top-right */}
+      <button onClick={toggleTheme} style={{
+        position:'absolute', top:16, right:16,
+        background:'var(--bg-surface)', border:'1px solid var(--border)',
+        borderRadius:8, padding:'0.5rem', cursor:'pointer',
+        display:'flex', alignItems:'center', color:'var(--text-secondary)'
+      }}>
+        {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
+      </button>
+
+      <div className="animate-in" style={{ width:'100%', maxWidth:380 }}>
+        {/* Brand */}
+        <div style={{ textAlign:'center', marginBottom:'2rem' }}>
+          <div style={{
+            width:52, height:52, borderRadius:14,
+            background:'var(--brand)', margin:'0 auto 0.875rem',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            boxShadow:'0 4px 16px rgba(37,99,235,0.35)'
+          }}>
+            <BarChart3 size={24} color="#fff" />
           </div>
-          <div>
-            <h1 className="font-display text-lg font-bold text-white leading-none">JasperPortal</h1>
-            <p className="text-xs text-slate-500 leading-none mt-0.5">Report Management System</p>
-          </div>
+          <h1 style={{ fontFamily:'Outfit', fontSize:'1.6rem', fontWeight:800, color:'var(--text-primary)', margin:0 }}>
+            JasperPortal
+          </h1>
+          <p style={{ color:'var(--text-muted)', fontSize:'0.875rem', marginTop:4 }}>
+            Plateforme de gestion des rapports
+          </p>
         </div>
 
-        <div className="glass rounded-2xl p-7">
-          <h2 className="font-display text-2xl font-bold text-white mb-1">Welcome back</h2>
-          <p className="text-slate-500 text-sm mb-6">Sign in to access your reports</p>
+        <div className="card" style={{ borderRadius:16, padding:'1.75rem' }}>
+          <h2 style={{ fontFamily:'Outfit', fontSize:'1.2rem', fontWeight:700, color:'var(--text-primary)', margin:'0 0 0.25rem' }}>
+            Connexion
+          </h2>
+          <p style={{ color:'var(--text-muted)', fontSize:'0.82rem', marginTop:0, marginBottom:'1.5rem' }}>
+            Accédez à votre espace de rapports
+          </p>
 
           {error && (
-            <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/25 rounded-lg px-3 py-2.5 mb-4 text-sm text-red-400">
-              <AlertCircle className="w-4 h-4 shrink-0" />
+            <div style={{
+              display:'flex', alignItems:'center', gap:8,
+              background:'#fef2f2', border:'1px solid #fca5a5',
+              borderRadius:8, padding:'0.625rem 0.75rem',
+              marginBottom:'1rem', fontSize:'0.875rem', color:'#dc2626'
+            }} className="dark:bg-red-900/20 dark:border-red-500/30 dark:text-red-400">
+              <AlertCircle size={15} style={{ flexShrink:0 }} />
               {error}
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:'1rem' }}>
             <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">Email address</label>
+              <label style={{ display:'block', fontSize:'0.8rem', fontWeight:600, color:'var(--text-secondary)', marginBottom:6 }}>
+                Adresse e-mail
+              </label>
               <input
-                type="email"
-                className="input-field"
+                type="email" className="input-field"
                 placeholder="admin@jasper.com"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                required
+                value={email} onChange={e => setEmail(e.target.value)} required
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">Password</label>
-              <div className="relative">
+              <label style={{ display:'block', fontSize:'0.8rem', fontWeight:600, color:'var(--text-secondary)', marginBottom:6 }}>
+                Mot de passe
+              </label>
+              <div style={{ position:'relative' }}>
                 <input
                   type={showPass ? 'text' : 'password'}
-                  className="input-field pr-10"
+                  className="input-field" style={{ paddingRight:'2.5rem' }}
                   placeholder="••••••••"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  required
+                  value={password} onChange={e => setPassword(e.target.value)} required
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPass(!showPass)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
-                >
-                  {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                <button type="button" onClick={() => setShowPass(!showPass)} style={{
+                  position:'absolute', right:10, top:'50%', transform:'translateY(-50%)',
+                  background:'none', border:'none', cursor:'pointer', color:'var(--text-muted)',
+                  display:'flex', alignItems:'center', padding:0
+                }}>
+                  {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
             </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-accent-500 hover:bg-accent-400 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 text-sm mt-2"
-            >
-              {loading ? (
-                <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Signing in...</>
-              ) : 'Sign in'}
+            <button type="submit" className="btn-primary" disabled={loading}
+              style={{ width:'100%', justifyContent:'center', padding:'0.625rem', marginTop:4, fontSize:'0.9rem' }}>
+              {loading
+                ? <><div style={{ width:16, height:16, border:'2px solid rgba(255,255,255,0.4)', borderTopColor:'#fff', borderRadius:'50%', animation:'spin 0.7s linear infinite' }} />Connexion...</>
+                : 'Se connecter'
+              }
             </button>
           </form>
-
-          <p className="text-center text-sm text-slate-500 mt-5">
-            Don't have an account?{' '}
-            <Link to="/register" className="text-accent-400 hover:text-accent-300 font-medium transition-colors">
-              Register
-            </Link>
-          </p>
         </div>
 
-        <p className="text-center text-xs text-slate-600 mt-4">
-          Default admin: admin@jasper.com / Admin@123
+        <p style={{ textAlign:'center', fontSize:'0.75rem', color:'var(--text-muted)', marginTop:'1rem' }}>
+          Compte par défaut : admin@jasper.com / Admin@123
         </p>
       </div>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import api from '../utils/api'
 import { User } from '../types'
 
@@ -8,6 +8,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>
   logout: () => void
   isAdmin: boolean
+  refreshUser: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
@@ -16,16 +17,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
+  const fetchMe = async () => {
+    try {
+      const res = await api.get('/auth/me')
+      setUser(res.data)
+    } catch {
+      localStorage.removeItem('access_token')
+      localStorage.removeItem('refresh_token')
+      setUser(null)
+    }
+  }
+
   useEffect(() => {
-    const token = localStorage.getItem('access_token')
-    if (token) {
-      api.get('/auth/me')
-        .then(res => setUser(res.data))
-        .catch(() => {
-          localStorage.removeItem('access_token')
-          localStorage.removeItem('refresh_token')
-        })
-        .finally(() => setLoading(false))
+    if (localStorage.getItem('access_token')) {
+      fetchMe().finally(() => setLoading(false))
     } else {
       setLoading(false)
     }
@@ -46,14 +51,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, isAdmin: user?.role?.name === 'admin' }}>
+    <AuthContext.Provider value={{
+      user, loading, login, logout,
+      isAdmin: user?.role?.name === 'admin',
+      refreshUser: fetchMe,
+    }}>
       {children}
     </AuthContext.Provider>
   )
 }
 
-export function useAuth() {
+export const useAuth = () => {
   const ctx = useContext(AuthContext)
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider')
+  if (!ctx) throw new Error('useAuth must be inside AuthProvider')
   return ctx
 }
