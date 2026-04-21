@@ -549,31 +549,42 @@ export default function ReportsPage() {
               </button>
 
               {/* Export row */}
-              <div style={{ display: 'flex', gap: 6 }}>
-                {EXPORT_FORMATS.map(fmt => (
-                  <button
-                    key={fmt.value}
-                    disabled={executing || previewing}
-                    onClick={() => handleExport(fmt.value)}
-                    style={{
-                      ...exportBtn,
-                      flex: 1,
-                      justifyContent: 'center',
-                      background: 'var(--brand)',
-                      color: '#fff',
-                      border: '1.5px solid var(--brand)',
-                      opacity: executing || previewing ? 0.6 : 1,
-                      cursor: executing || previewing ? 'not-allowed' : 'pointer',
-                      padding: '0.42rem 0',
-                    }}
-                  >
-                    {executing
-                      ? <Loader2 size={12} style={{ animation: 'spin 0.7s linear infinite' }} />
-                      : <Download size={12} />
-                    }
-                    {fmt.label}
-                  </button>
-                ))}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {EXPORT_FORMATS.map(fmt => {
+                    const isDisabled = executing || previewing || !previewUrl
+                    return (
+                      <button
+                        key={fmt.value}
+                        disabled={isDisabled}
+                        onClick={() => handleExport(fmt.value)}
+                        title={!previewUrl ? 'Lancez d\'abord un aperçu' : `Exporter en ${fmt.label}`}
+                        style={{
+                          ...exportBtn,
+                          flex: 1,
+                          justifyContent: 'center',
+                          background: isDisabled ? 'var(--bg-surface-3)' : 'var(--brand)',
+                          color: isDisabled ? 'var(--text-muted)' : '#fff',
+                          border: `1.5px solid ${isDisabled ? 'var(--border)' : 'var(--brand)'}`,
+                          opacity: isDisabled ? 0.6 : 1,
+                          cursor: isDisabled ? 'not-allowed' : 'pointer',
+                          padding: '0.42rem 0',
+                        }}
+                      >
+                        {executing
+                          ? <Loader2 size={12} style={{ animation: 'spin 0.7s linear infinite' }} />
+                          : <Download size={12} />
+                        }
+                        {fmt.label}
+                      </button>
+                    )
+                  })}
+                </div>
+                {!previewUrl && (
+                  <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: 0, textAlign: 'center' }}>
+                    Lancez un aperçu pour activer l'export
+                  </p>
+                )}
               </div>
 
               {/* Refresh preview link (visible only when preview exists) */}
